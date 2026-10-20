@@ -45,4 +45,16 @@ public enum MJSecureStore {
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
     }
+
+    /// Keychain items survive app deletion. On the first launch after a (re)install,
+    /// wipe every generic-password item this app owns, then set the `hasLaunched` flag.
+    public static func wipeIfFreshInstall(defaults: UserDefaults = .standard) {
+        let flag = "hasLaunched"
+        guard !defaults.bool(forKey: flag) else { return }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword
+        ]
+        SecItemDelete(query as CFDictionary)
+        defaults.set(true, forKey: flag)
+    }
 }

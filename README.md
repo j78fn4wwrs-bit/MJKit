@@ -11,6 +11,8 @@ Shared Swift package for Mike Johnson's iOS apps (iOS 18+, swift-tools 5.10).
 | `PilotProfile` / `PilotProfileStore` | Pilot data as JSON with `.completeFileProtection`. Part 107 cert number stored only in Keychain. `recurrentTrainingDue` = end of 24th month. |
 | `MJSettingsView` | About, version, restore, privacy/terms sections for a `Form`. |
 
+`MJSecureStore.wipeIfFreshInstall()` — call at app start: deletes leftover Keychain items after a reinstall (uses UserDefaults `hasLaunched`; apps must declare UserDefaults CA92.1 in PrivacyInfo.xcprivacy).
+
 Rules: no networking except StoreKit, no analytics, never log user values.
 
 ## Use (XcodeGen)
