@@ -11,9 +11,15 @@ Shared Swift package for Mike Johnson's iOS apps (iOS 18+, swift-tools 5.10).
 | `PilotProfile` / `PilotProfileStore` | Pilot data as JSON with `.completeFileProtection`. Part 107 cert number stored only in Keychain. `recurrentTrainingDue` = end of 24th month. |
 | `MJSettingsView` | About, version, restore, privacy/terms sections for a `Form`. |
 
-`MJSecureStore.wipeIfFreshInstall()` — call at app start: deletes leftover Keychain items after a reinstall (uses UserDefaults `hasLaunched`; apps must declare UserDefaults CA92.1 in PrivacyInfo.xcprivacy).
+`MJSecureStore.wipeIfFreshInstall()` — call at app start, before reading the Keychain. If UserDefaults `hasLaunched` is missing, it deletes every item in the app's default keychain access group (all item classes, synchronizable and not) and then sets the flag. A locked device leaves the flag unset so the next launch can retry. Apps must declare UserDefaults CA92.1 in PrivacyInfo.xcprivacy.
 
-Rules: no networking except StoreKit, no analytics, never log user values.
+Rules: no networking except StoreKit, no analytics, never log user values. Privacy Policy and Terms links open in the system browser; the package does not fetch them.
+
+## Building
+
+`platforms: [.iOS("18.0")]` is the Swift tools 5.10 string overload. `.iOS(.v18)` is not available until PackageDescription 6.0.
+
+StoreKit, SwiftUI, Security, and LocalAuthentication are behind `#if canImport`. On Linux, `swift build` and `swift test` compile `PilotProfile` (including the 24-calendar-month due date) and the fresh-install flag check.
 
 ## Use (XcodeGen)
 ```yaml

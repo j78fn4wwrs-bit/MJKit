@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 
 /// Pilot profile shared by Mike's drone apps.
 /// `part107CertNumber` is deliberately NOT in CodingKeys: it lives only in the Keychain.
@@ -32,58 +31,46 @@ public struct PilotProfile: Codable, Equatable {
         self.notes = notes
     }
 
-    /// Part 107 recurrent training is due within 24 calendar months of the last
-    /// test/training (FAA: by the end of the 24th calendar month).
+    /// Part 107 currency ends at 23:59:59 on the last day of the 24th calendar
+    /// month after the last test or training (14 CFR 107.65). Falls back to the
+    /// initial issue date when no recurrent date is recorded.
     public var recurrentTrainingDue: Date? {
         guard let base = lastRecurrentTrainingDate ?? part107IssueDate else { return nil }
-        let calendar = Calendar.current
-        guard let plus24 = calendar.date(byAdding: .month, value: 24, to: base),
-              let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: plus24)),
-              let nextMonth = calendar.date(byAdding: .month, value: 1, to: monthStart),
-              let endOfMonth = calendar.date(byAdding: .day, value: -1, to: nextMonth) else { return nil }
-        return endOfMonth
-    }
-}
-
-/// Saves the profile as JSON in Application Support with complete file protection.
-/// The Part 107 certificate number goes to MJSecureStore (Keychain), never to the JSON.
-@MainActor
-public final class PilotProfileStore: ObservableObject {
-    @Published public private(set) var profile: PilotProfile
-
-    private let fileURL: URL
-    private let certKey = "mjkit.pilot.part107CertNumber"
-
-    public init(fileName: String = "pilot-profile.json") {
-        let fm = FileManager.default
-        let dir = (try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
-            ?? fm.temporaryDirectory
-        let url = dir.appendingPathComponent(fileName)
-        self.fileURL = url
-        var loaded = PilotProfile()
-        if let data = try? Data(contentsOf: url),
-           let decoded = try? JSONDecoder().decode(PilotProfile.self, from: data) {
-            loaded = decoded
-        }
-        loaded.part107CertNumber = MJSecureStore.get("mjkit.pilot.part107CertNumber") ?? ""
-        self.profile = loaded
+        return Self.recurrentTrainingDue(from: base, calendar: .current)
     }
 
-    public func save(_ newProfile: PilotProfile) {
-        profile = newProfile
-        if newProfile.part107CertNumber.isEmpty {
-            MJSecureStore.delete(certKey)
-        } else {
-            MJSecureStore.set(newProfile.part107CertNumber, for: certKey)
-        }
-        if let data = try? JSONEncoder().encode(newProfile) {
-            try? data.write(to: fileURL, options: [.atomic, .completeFileProtection])
-        }
+    /// End of the calendar month 24 months after `base`'s month, at 23:59:59.
+    /// Month arithmetic uses year and month only, so Jan 31 and Feb 29 do not
+    /// spill into the following month.
+    static func recurrentTrainingDue(from base: Date, calendar: Calendar) -> Date? {
+        let parts = calendar.dateComponents([.year, .month], from: base)
+        guard let year = parts.year, let month = parts.month else { return nil }
+        var start = DateComponents()
+        start.calendar = calendar
+        start.year = year
+        start.month = month + 24
+        start.day = 1
+        guard let firstOfMonth = calendar.date(from: start),
+              let dayRange = calendar.range(of: .day, in: .month, for: firstOfMonth) else { return nil }
+        let normalized = calendar.dateComponents([.year, .month], from: firstOfMonth)
+        var end = DateComponents()
+        end.calendar = calendar
+        end.year = normalized.year
+        end.month = normalized.month
+        end.day = dayRange.upperBound - 1
+        end.hour = 23
+        end.minute = 59
+        end.second = 59
+        return calendar.date(from: end)
     }
 
-    /// Re-read the Keychain value (e.g. after the device was locked at launch).
-    public func reloadSecureFields() {
-        let cert = MJSecureStore.get(certKey) ?? ""
-        if cert != profile.part107CertNumber { profile.part107CertNumber = cert }
+    /// JSON fields only. The certificate number is stored in the Keychain, not the file.
+    var hasProtectedFileContent: Bool {
+        !name.isEmpty
+            || part107IssueDate != nil
+            || lastRecurrentTrainingDate != nil
+            || trustCompletionDate != nil
+            || !faaRegistrationNumbers.isEmpty
+            || !notes.isEmpty
     }
 }

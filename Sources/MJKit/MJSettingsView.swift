@@ -1,3 +1,4 @@
+#if canImport(SwiftUI) && canImport(StoreKit)
 import SwiftUI
 
 /// Standard settings sections: about, restore, privacy/terms, version.
@@ -50,3 +51,4 @@ public struct MJSettingsView: View {
         return "\(version) (\(build))"
     }
 }
+#endif

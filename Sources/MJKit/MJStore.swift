@@ -1,3 +1,4 @@
+#if canImport(StoreKit) && canImport(Combine)
 import Foundation
 import StoreKit
 import Combine
@@ -12,12 +13,13 @@ public final class MJStore: ObservableObject {
     @Published public private(set) var isBusy: Bool = false
     @Published public var errorMessage: String?
 
-    private var updatesTask: Task<Void, Never>?
+    private nonisolated(unsafe) var updatesTask: Task<Void, Never>?
 
     public init(proProductIDs: Set<String>) {
         self.proProductIDs = proProductIDs
         updatesTask = Task { [weak self] in
             for await result in Transaction.updates {
+                if Task.isCancelled { break }
                 if case .verified(let transaction) = result {
                     await transaction.finish()
                 }
@@ -28,6 +30,10 @@ public final class MJStore: ObservableObject {
             await self?.refreshEntitlements()
             await self?.loadProducts()
         }
+    }
+
+    deinit {
+        updatesTask?.cancel()
     }
 
     /// The first Pro product (most apps have exactly one).
@@ -55,19 +61,24 @@ public final class MJStore: ObservableObject {
     }
 
     public func purchase(_ product: Product? = nil) async {
+        errorMessage = nil
+        isBusy = true
+        defer { isBusy = false }
         if products.isEmpty { await loadProducts() }
         guard let target = product ?? proProduct else {
             errorMessage = "The upgrade isn't available right now. Try again later."
             return
         }
-        isBusy = true
-        defer { isBusy = false }
         do {
             let result = try await target.purchase()
             switch result {
             case .success(let verification):
-                if case .verified(let transaction) = verification {
+                switch verification {
+                case .verified(let transaction):
                     await transaction.finish()
+                case .unverified(_, _):
+                    // Do not surface the verification error; it can echo StoreKit details.
+                    errorMessage = "Purchase couldn't be verified. Please try again."
                 }
                 await refreshEntitlements()
             case .userCancelled, .pending:
@@ -81,6 +92,7 @@ public final class MJStore: ObservableObject {
     }
 
     public func restore() async {
+        errorMessage = nil
         isBusy = true
         defer { isBusy = false }
         do {
@@ -89,8 +101,11 @@ public final class MJStore: ObservableObject {
             errorMessage = "Restore didn't complete. Please try again."
         }
         await refreshEntitlements()
-        if !isPro && errorMessage == nil {
+        if isPro {
+            errorMessage = nil
+        } else if errorMessage == nil {
             errorMessage = "No previous purchase found for this Apple Account."
         }
     }
 }
+#endif
