@@ -1,0 +1,2 @@
+# MJKit
+Shared Swift package
