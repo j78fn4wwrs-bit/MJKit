@@ -79,4 +79,13 @@ final class SourcePolicyTests: XCTestCase {
             XCTAssertTrue(text.contains(token), "\(name) should be guarded by \(token)")
         }
     }
+
+    func testBiometricGateUsesCompletionHandler() throws {
+        let url = try XCTUnwrap(sourceFiles.first { $0.lastPathComponent == "MJBiometricGate.swift" })
+        let text = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(text.contains("@preconcurrency import LocalAuthentication"))
+        XCTAssertTrue(text.contains("withCheckedContinuation"))
+        XCTAssertTrue(text.contains(".deviceOwnerAuthentication"))
+        XCTAssertFalse(text.contains("await context.evaluatePolicy"))
+    }
 }
