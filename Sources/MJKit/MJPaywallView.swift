@@ -1,5 +1,5 @@
+#if canImport(SwiftUI) && canImport(StoreKit)
 import SwiftUI
-import StoreKit
 
 /// Honest one-time-unlock paywall. No timers, no fake discounts, no dark patterns.
 public struct MJPaywallView: View {
@@ -101,3 +101,4 @@ public struct MJPaywallView: View {
         return "Unlock Pro"
     }
 }
+#endif

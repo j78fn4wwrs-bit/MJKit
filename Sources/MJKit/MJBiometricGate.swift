@@ -1,7 +1,9 @@
+#if canImport(LocalAuthentication)
 import Foundation
 import LocalAuthentication
 
 /// Face ID / Touch ID with device-passcode fallback.
+/// `.deviceOwnerAuthentication` tries biometrics first, then the device passcode.
 public enum MJBiometricGate {
     public static func authenticate(reason: String) async -> Bool {
         let context = LAContext()
@@ -16,3 +18,4 @@ public enum MJBiometricGate {
         }
     }
 }
+#endif
